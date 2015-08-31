@@ -1,0 +1,5 @@
+.idea
+_pychache_
+*.pyc
+*.txt
+*.dict
