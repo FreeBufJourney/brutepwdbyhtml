@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file '登录界面4.ui'
+# Form implementation generated from reading ui file '登录界面6.ui'
 #
 # Created by: PyQt4 UI code generator 4.11.4
 #
@@ -24,9 +24,12 @@ except AttributeError:
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
+        #MainWindow.setWindowTitle('web应用网站弱口令检测工具--湖南电科院版权所有')
         MainWindow.setObjectName(_fromUtf8("MainWindow"))
-        MainWindow.setWindowIcon(QtGui.QIcon('WIFI_CHEAT.ico'))
         MainWindow.resize(800, 600)
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap(_fromUtf8("WIFI_CHEAT.ico")), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        MainWindow.setWindowIcon(icon)
         self.centralwidget = QtGui.QWidget(MainWindow)
         self.centralwidget.setObjectName(_fromUtf8("centralwidget"))
         self.horizontalLayout_2 = QtGui.QHBoxLayout(self.centralwidget)
@@ -40,13 +43,13 @@ class Ui_MainWindow(object):
         self.urls = QtGui.QPlainTextEdit(self.groupBox_3)
         self.urls.setObjectName(_fromUtf8("urls"))
         self.verticalLayout_5.addWidget(self.urls)
+        self.url_analysis_process_label = QtGui.QLabel(self.groupBox_3)
+        self.url_analysis_process_label.setText(_fromUtf8(""))
+        self.url_analysis_process_label.setObjectName(_fromUtf8("url_analysis_process_label"))
+        self.verticalLayout_5.addWidget(self.url_analysis_process_label)
         self.urlAnalysis = QtGui.QPushButton(self.groupBox_3)
         self.urlAnalysis.setObjectName(_fromUtf8("urlAnalysis"))
         self.verticalLayout_5.addWidget(self.urlAnalysis)
-        self.url_analysis_process_label = QtGui.QLabel(self.groupBox_3)
-        self.url_analysis_process_label.setText(_fromUtf8(''))
-        self.url_analysis_process_label.setObjectName(_fromUtf8('url_analysis_process_label'))
-        self.verticalLayout_5.addWidget(self.url_analysis_process_label)
         self.verticalLayout_6.addWidget(self.groupBox_3)
         self.horizontalLayout_2.addLayout(self.verticalLayout_6)
         self.verticalLayout_4 = QtGui.QVBoxLayout()
@@ -85,17 +88,6 @@ class Ui_MainWindow(object):
         self.groupBox_2.setObjectName(_fromUtf8("groupBox_2"))
         self.verticalLayout_2 = QtGui.QVBoxLayout(self.groupBox_2)
         self.verticalLayout_2.setObjectName(_fromUtf8("verticalLayout_2"))
-        #self.analysisResultTxtEdit = QtGui.QTextEdit(self.groupBox_2)
-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        # sizePolicy.setHeightForWidth(self.analysisResultTxtEdit.sizePolicy().hasHeightForWidth())
-        # self.analysisResultTxtEdit.setSizePolicy(sizePolicy)
-        # self.analysisResultTxtEdit.setMinimumSize(QtCore.QSize(0, 50))
-        # self.analysisResultTxtEdit.setMaximumSize(QtCore.QSize(16777215, 50))
-        # self.analysisResultTxtEdit.setBaseSize(QtCore.QSize(0, 10))
-        # self.analysisResultTxtEdit.setObjectName(_fromUtf8("analysisResultTxtEdit"))
-        # self.verticalLayout_2.addWidget(self.analysisResultTxtEdit)
         self.tableWidget = QtGui.QTableWidget(self.groupBox_2)
         self.tableWidget.setObjectName(_fromUtf8("tableWidget"))
         self.tableWidget.setColumnCount(3)
@@ -123,13 +115,12 @@ class Ui_MainWindow(object):
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
-        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow", None))
-        MainWindow.setWindowIcon(QtGui.QIcon('WIFI_CHEA.ico'))
+        MainWindow.setWindowTitle(_translate("MainWindow", "web应用网站弱口令检测工具", None))
         self.groupBox_3.setTitle(_translate("MainWindow", "网址", None))
         self.urlAnalysis.setText(_translate("MainWindow", "网址分析", None))
         self.groupBox.setTitle(_translate("MainWindow", "操作", None))
-        self.usrnamefilebtn.setText(_translate("MainWindow", "选取用户名文件", None))
-        self.pwdfilebtn.setText(_translate("MainWindow", "选取密码文件", None))
+        self.usrnamefilebtn.setText(_translate("MainWindow", "文件名", None))
+        self.pwdfilebtn.setText(_translate("MainWindow", "密码", None))
         self.websiteanalysisbtn.setText(_translate("MainWindow", "开始分析", None))
         self.export.setText(_translate("MainWindow", "导出结果", None))
         self.usernamefilepath_label.setText(_translate("MainWindow", "用户名文件：", None))

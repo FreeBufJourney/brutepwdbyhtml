@@ -41,10 +41,10 @@ class form_url:
         session = requests.session()
         #为请求添加session
         self.session = session
-        response = requests.get(url,headers=self.headers,timeout=5)
+        response = requests.get(url,headers=self.headers,timeout=3,)
         self.statusCode = response.status_code
         str_text = response.text
-        soup = BeautifulSoup(str_text)
+        soup = BeautifulSoup(str_text,"html.parser")
         forms = soup.find_all("form")
         form = ""
         #找到提交表单的form
@@ -81,9 +81,11 @@ class form_url:
         actionUrl = ''
         try:
             action = self.form["action"]
+            if action.strip() == '':
+                return ''
         except KeyError as e:
             logger.info(e)
-            return None
+            return ''
         #action不是以http开头
         if not action.find("http")==0:
             # #如果action是以"/"开头
@@ -248,7 +250,7 @@ class form_url:
 
     def get_captcha_tag(self,form):
         #remove all hidden button
-        tempform = BeautifulSoup(str(form))
+        tempform = BeautifulSoup(str(form), "html.parser")
         hidden_button = tempform.select('input[type="hidden"]')
         for button in hidden_button:
             button.decompose()
@@ -339,7 +341,7 @@ class form_url:
         #请求网页获得cookie
         session = requests.session()
         contents = session.get(self.url,headers=headers)
-        contents_soup = BeautifulSoup(contents.text)
+        contents_soup = BeautifulSoup(contents.text,"html.parser")
         for key in self.extradata:
             value = contents_soup.find("input",{"name":key})["value"]
             self.extradata[key] = value
@@ -411,7 +413,11 @@ if __name__ == '__main__':
     url = 'https://account.tophant.com/login.html?response_type=code&client_id=b611bfe4ef417dbc&state=b5a97a29efa454b865ecb998f3433a26&redirectURL=http://open.freebuf.com'
     url = 'http://www.v2ex.com/signin'
     url = 'http://www.shanbay.com/accounts/login/'
+    url = 'http://10.1.17.16:8020/jsp/login.jsp'
+    # url = 'http://toutiao.io/ssignin'
+    # url = 'http://news.dbanotes.net/x?fnid=FtAVoDBUul'
     form = form_url(url)
     print(form.maindata)
+    print(form.extradata)
     print(form.hasCaptcha)
     print(form.posturl)

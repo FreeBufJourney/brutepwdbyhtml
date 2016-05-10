@@ -1,4 +1,5 @@
 import re
+import traceback
 from urllib.parse import urlparse
 from PyQt4 import QtCore
 import threading
@@ -35,11 +36,12 @@ class FormDataWarapper():
 
 class MyLoginThread(QtCore.QThread):
 
-    errortextlength = []
-    successtextlength = []
+    errortextlength = set()
+    successtextlength = set()
 
     trigger = QtCore.pyqtSignal(PostResponseWrapper)
     finished = QtCore.pyqtSignal()
+    processing = QtCore.pyqtSignal()
 
     def __init__(self,usernamedict,pwddict,form_url):
         super(MyLoginThread, self).__init__()
@@ -52,6 +54,7 @@ class MyLoginThread(QtCore.QThread):
         for username in self.usernamedict:
             for password in self.pwddict:
                 result,responsedata= self.__post_form(username,password)
+                self.processing.emit()
                 if result:
                     self.trigger.emit(responsedata)
         self.finished.emit()
@@ -62,7 +65,11 @@ class MyLoginThread(QtCore.QThread):
         postdata[self.formdata.maindata['password']] = 'wyj'
         if self.formdata.hascaptcha:
             errorpageLength = self.__post_data_with_captcha(postdata,self.formdata.captcha_url)
-            self.errortextlength.append(errorpageLength)
+            self.errortextlength.add(errorpageLength)
+        else:
+            errorpageLength  =self.__post_data_without_captcha(postdata)
+            print(errorpageLength)
+            self.errortextlength.add(errorpageLength)
 
     def __post_data_with_captcha(self,postdata,captchaurl):
         session = requests.session()
@@ -85,25 +92,67 @@ class MyLoginThread(QtCore.QThread):
         pageLength = len(responseHtml)
         return pageLength
 
+    def __post_data_without_captcha(self,postdata):
+        session = requests.session()
+        postdata.update(self.formdata.extradata)
+        postresponse = session.post(self.formdata.post_url,data=postdata,headers=self.formdata.headers)
+        responseHtml = postresponse.text
+        pageLength = len(responseHtml)
+        return pageLength
+
     def __post_form(self,username,pwd):
         postdata = {}
         postdata[self.formdata.maindata['username']] = username
         postdata[self.formdata.maindata['password']] = pwd
         session = requests.session()
         if self.formdata.hascaptcha:
-            response = session.get(self.formdata.captcha_url)
-            imagedata = response.content
-            f = open('image.jpg','wb')
-            f.write(imagedata)
-            f.close()
-            try:
-                imgstr =image_to_string(Image.open('image.jpg'))
-                print(imgstr)
-                postdata[self.formdata.maindata['captcha']] = imgstr
-            except UnicodeDecodeError:
-                pass
+            captcha_decoded = False
+            while not captcha_decoded:
+                response = session.get(self.formdata.captcha_url)
+                imagedata = response.content
+                f = open('image.jpg','wb')
+                f.write(imagedata)
+                f.close()
+                try:
+                    imgstr =image_to_string(Image.open('image.jpg'))
+                    print(imgstr)
+                    m = re.match('[a-zA-Z0-9]+',imgstr)
+                    #验证码识别成功，则停止识别
+                    if m:
+                        postdata[self.formdata.maindata['captcha']] = imgstr
+                    else:
+                        continue
+                except UnicodeDecodeError as e:
+                    print(e)
+                    continue
+                postresponse = self.__post_form_with_data(session,postdata)
 
-        contents = session.get(self.formdata.post_url,headers=self.formdata.headers,timeout=3)
+                if not postresponse:
+                    return False,PostResponseWrapper(username,pwd,None,False,self.formdata.post_url)
+
+                responseHtml = postresponse.text
+
+                captcha_pattern  ='正确地?输入验证码|验证码输入错误|重新输入验证码|验证码错误|验证码不正确|验证码输入不正确'
+                compile_pattern = re.compile(captcha_pattern)
+                match = compile_pattern.search(responseHtml)
+                #验证码识别正确
+                if  not match:
+                    loginresult = self.__judeg_login_success(postresponse)
+                    pagelen = len(responseHtml)
+                    return loginresult,PostResponseWrapper(username,pwd,pagelen,loginresult,self.formdata.post_url)
+        else:
+            postresponse = self.__post_form_with_data(session,postdata)
+            if not postresponse:
+                return False,PostResponseWrapper(username,pwd,None,False,self.formdata.post_url)
+
+            responseHtml = postresponse.text
+            loginresult = self.__judeg_login_success(postresponse)
+            pagelen = len(responseHtml)
+            return loginresult,PostResponseWrapper(username,pwd,pagelen,loginresult,self.formdata.post_url)
+
+
+    def __post_form_with_data(self,session,postdata):
+        contents = session.get(self.formdata.url,headers=self.formdata.headers,timeout=3)
         contents_soup = BeautifulSoup(contents.text)
         extradata = {}
         for key in self.formdata.extradata:
@@ -112,16 +161,22 @@ class MyLoginThread(QtCore.QThread):
                 extradata[key] = value
             except:
                 extradata[key] = ''
-        postdata.update(extradata)
-
-        postresponse = session.post(self.formdata.post_url,data=postdata,headers=self.formdata.headers,timeout=3)
-
+        extradata.update(postdata)
+        postdata = extradata
+        print('最终提交参数',postdata)
+        postresposne = None
+        try:
+            postresponse = session.post(self.formdata.post_url,data=postdata,headers=self.formdata.headers,timeout=5)
+        except:
+            traceback.print_exc()
         responseHtml = postresponse.text
+        return postresponse
 
+    def __judeg_login_success(self,postresponse):
+        responseHtml = postresponse.text
         pagelen = len(responseHtml)
-
         loginresult = False
-
+        print(responseHtml)
         #if the html redirect
         if not len(postresponse.history)==0:
             history = postresponse.history[0].status_code
@@ -132,26 +187,29 @@ class MyLoginThread(QtCore.QThread):
                 else:
                     if self.__error_login_page(responseHtml):
                         print("跳转之后，登录失败",len(responseHtml))
-                        self.errortextlength.append(len(responseHtml))
+                        self.errortextlength.add(len(responseHtml))
                     else:
                         print("登录成功，页面变化",len(responseHtml))
                         loginresult = True
-                        self.successtextlength.append(len(responseHtml))
+                        self.successtextlength.add(len(responseHtml))
         else:
             textlength = len(responseHtml)
+            print(textlength)
+            print(self.errortextlength)
             if self.__error_login_page(responseHtml):
-                self.errortextlength.append(textlength)
+                self.errortextlength.add(textlength)
                 print("登录失败,error",textlength)
             elif textlength in self.errortextlength:
                 print("登录失败",textlength)
             elif textlength in self.successtextlength:
                 print("登录成功",textlength)
             else:
-                print(postresponse.status_code)
-        return loginresult,PostResponseWrapper(username,pwd,pagelen,loginresult,self.formdata.url)
+                print('返回值为:',postresponse.status_code)
+                loginresult = True
+        return loginresult
 
     def __error_login_page(self,html):
-        pattern = "无效|错误|不存在|不正确|重新|填写|验证码|输入"
+        pattern = "无效|错误|不存在|不正确|重新|填写|验证码|输入|失败"
         re_error_pattern = re.compile(pattern)
         flags = re.findall(re_error_pattern,html)
         if(len(flags)>0):

@@ -125,17 +125,24 @@ class  UrlAnalysis():
 
     def __validate_url(self,url):
         try:
-            response = requests.get(url,timeout=3)
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36"}
+            response = requests.get(url,timeout=3,headers=headers)
         except:
             return False
         html_text = response.text
-        html_soup = BeautifulSoup(html_text)
+        html_soup = BeautifulSoup(html_text, "html.parser")
         #check is there form
         forms = html_soup.find('form')
         if not forms:
             return False
         else:
             return True
+
+    def get_deep_url(url):
+        url_list = ['ssignin','login.php','','signin']
+        for suffix in url_list:
+            url = url + '/' +suffix
+
 
 class IpAnalysis():
 
@@ -147,7 +154,7 @@ class IpAnalysis():
         iplist =  [url for url in all_url_list if url[0].isdigit()]
         all_ips = []
         for ip in iplist:
-            if re.seacrh('-',ip):
+            if re.search('-',ip):
                 ips = self.__get_all_ips_by_separator(ip)
                 all_ips.extend(ips)
             elif re.search('/',ip):

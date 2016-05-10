@@ -9,7 +9,8 @@ from MyWidgets.SimulateHelper import MyLoginThread, QWebLogicThread, QTomcatThre
 from MyWidgets.UrlHelper import UrlAnalysis, IpAnalysis, QUrlIPAnalysisThread
 from MyWidgets.formHelper import form_url
 from MyWidgets.exportHelper import ExportResults
-from ui8 import Ui_MainWindow
+# from ui8 import Ui_MainWindow
+from ui9 import Ui_MainWindow
 
 
 class MyForm(Ui_MainWindow):
@@ -17,9 +18,8 @@ class MyForm(Ui_MainWindow):
     def __init__(self):
         super(MyForm, self).__init__()
         self.valid_urls_list = []
-
         self.username_file = 'D:/username.txt'
-        self.pwd_file = 'D:/pwdlist.txt'
+        self.pwd_file = 'D:/password.txt'
         self.username_list = []
         self.pwd_list = []
         self.activedthreadleft = 0
@@ -27,9 +27,11 @@ class MyForm(Ui_MainWindow):
         self.can_decoded_forms = None
         self.weblogic_url_list = []
         self.tomcat_url_list = []
+        self.processing_num = 0
 
     def setupUi(self,MainWindow):
         super(MyForm, self).setupUi(MainWindow)
+
         self.tableWidget.setSortingEnabled(True)
         self.urlAnalysis.clicked.connect(lambda:self.get_url_list(self.urls.toPlainText()))
 
@@ -37,13 +39,14 @@ class MyForm(Ui_MainWindow):
         self.pwdfilebtn.clicked.connect(self.get_pwd_file_dialog)
 
         self.websiteanalysisbtn.clicked.connect(self.start_analysis_login)
-        self.export.clicked.connect(self.exportResult)
+        self.export.clicked.connect(self.exportResult2)
 
         self.initUI()
 
     def initUI(self):
         self.usernamefilepath_label.setText('用户名文件:'+self.username_file)
         self.pwdfilepath_label.setText('密码文件:'+self.pwd_file)
+        self.statusbar.showMessage('进度')
 
     def get_url_list2(self,urls):
         urls_list = urls.splitlines()
@@ -81,9 +84,11 @@ class MyForm(Ui_MainWindow):
 
     def start_analysis_login(self):
         #read the usernamefile and pwdfile
+        read_file_result = 0
         if self.can_decoded_forms:
-            self.__read_file()
-
+            read_file_result = self.__read_file()
+        if read_file_result == -1:
+            return
         threads = []
         for form in self.can_decoded_forms:
             thread = self.__login_web(form)
@@ -98,8 +103,9 @@ class MyForm(Ui_MainWindow):
             threads.append(thread)
 
         self.activedthreadleft = len(threads)
-        for thread in threads:
-            thread.start()
+        if threads:
+            for thread in threads:
+                thread.start()
 
     def __read_file(self):
         usernames = []
@@ -111,11 +117,11 @@ class MyForm(Ui_MainWindow):
                         usernames.append(line.strip())
                 except UnicodeDecodeError:
                     QtGui.QMessageBox.warning(None,'错误','读取密码弱口令文件错误')
-                    return
+                    return -1
         except:
             traceback.print_exc()
             QtGui.QMessageBox.warning(None,'错误','读取用户名弱口令文件错误')
-            return
+            return -1
 
         try:
             with open(self.pwd_file) as file:
@@ -124,11 +130,11 @@ class MyForm(Ui_MainWindow):
                         pwds.append(line.strip())
                 except UnicodeDecodeError:
                     QtGui.QMessageBox.warning(None,'错误','读取密码弱口令文件错误')
-                    return
+                    return -1
         except:
             traceback.print_exc()
             QtGui.QMessageBox.warning(None,'错误','读取密码弱口令文件错误')
-            return
+            return -1
         self.username_list = usernames
         self.pwd_list = pwds
 
@@ -136,6 +142,7 @@ class MyForm(Ui_MainWindow):
         self.LoginThread = MyLoginThread(self.username_list,self.pwd_list,form)
         self.LoginThread.trigger.connect(self.updateTableWidget)
         self.LoginThread.finished.connect(self.threadleft)
+        self.LoginThread.processing.connect(self.processing_show)
         return self.LoginThread
 
     def __login_weblogic(self,url):
@@ -159,10 +166,21 @@ class MyForm(Ui_MainWindow):
         self.invalid_urls = AnalysisResponse.invalid_urls
         self.can_decoded_forms = AnalysisResponse.can_decoded_forms
         self.cannot_decode_form_urls = AnalysisResponse.cannot_decode_form_urls
-        can_decode_form_urls = [form.url for form in self.can_decoded_forms]
-        self.urls.setPlainText('\n'.join(can_decode_form_urls))
-        self.urls.appendPlainText('\n'.join(self.weblogic_url_list))
-        self.urls.appendPlainText('\n'.join(self.tomcat_url_list))
+        can_decode_form_urls = [form.url for form in self.can_decoded_forms if form.posturl!='']
+        decode_form_urls_without_action = [form.url for form in self.can_decoded_forms if form.posturl =='']
+        self.urls.setPlainText('')
+        if can_decode_form_urls:
+            self.urls.appendPlainText('--------------解析出form表单的URL-------------------')
+            self.urls.appendPlainText('\n'.join(can_decode_form_urls))
+            self.urls.appendPlainText('-----------------------------------------------\n')
+        if self.weblogic_url_list:
+            self.urls.appendPlainText('-------------- 发现weblogic登录的URL-------------------')
+            self.urls.appendPlainText('\n'.join(self.weblogic_url_list))
+            self.urls.appendPlainText('-----------------------------------------------\n')
+        if self.tomcat_url_list:
+            self.urls.appendPlainText('----------- 发现tomcat登录的URL-------------')
+            self.urls.appendPlainText('\n'.join(self.tomcat_url_list))
+            self.urls.appendPlainText('-----------------------------------------------\n')
         if self.invalid_urls:
             self.urls.appendPlainText('\n--------------不能登录的URL-------------------')
             self.urls.appendPlainText('\n'.join(self.invalid_urls))
@@ -170,6 +188,10 @@ class MyForm(Ui_MainWindow):
         if self.cannot_decode_form_urls:
             self.urls.appendPlainText('\n--------------无法解析出form表单的URL-------------------')
             self.urls.appendPlainText('\n'.join(self.cannot_decode_form_urls))
+            self.urls.appendPlainText('-----------------------------------------------')
+        if decode_form_urls_without_action:
+            self.urls.appendPlainText('\n--------------无法提取登录url-------------------')
+            self.urls.appendPlainText('\n'.join(decode_form_urls_without_action))
             self.urls.appendPlainText('-----------------------------------------------')
         self.url_analysis_process_label.setText('分析结束')
 
@@ -186,17 +208,38 @@ class MyForm(Ui_MainWindow):
         if self.activedthreadleft == 0:
             QtGui.QMessageBox.warning(None,'Messagebox','执行完毕')
 
+    def processing_show(self):
+        self.processing_num += 1
+        processing_str = str(self.processing_num)
+        self.statusbar.showMessage(processing_str)
+
     def exportResult2(self):
-        current_path = os.getcwd()
-        export_file = current_path+'\\'+'result.txt'
-        f = open(export_file,'w')
-        row_count = self.tableWidget.rowCount()
-        for i in range(0,row_count):
-            url = self.tableWidget.item(i,2).text()
-            usrname = self.tableWidget.item(i,0).text()
-            pwd = self.tableWidget.item(i,1).text()
-            f.write(usrname+'       '+pwd+'     '+url+'\n')
-        f.close()
+        # current_path = os.getcwd()
+        # export_file = current_path+'\\'+'result.txt'
+        # f = open(export_file,'w')
+        # row_count = self.tableWidget.rowCount()
+        # for i in range(0,row_count):
+        #     url = self.tableWidget.item(i,2).text()
+        #     usrname = self.tableWidget.item(i,0).text()
+        #     pwd = self.tableWidget.item(i,1).text()
+        #     f.write(usrname+'       '+pwd+'     '+url+'\n')
+        # f.close()
+        # fname = QtGui.QFileDialog.getOpenFileName(None, 'Open file', 'C:/')
+        selected_directry = QtGui.QFileDialog.getExistingDirectory(None,'select Directory','C:/')
+        if selected_directry:
+            current_directory = selected_directry
+            export_file  =current_directory + '\\'+'result.txt'
+            f = open(export_file,'w')
+            f.write('用户名'+'       '+'密码'+'     '+'网址'+'\n')
+            row_count = self.tableWidget.rowCount()
+            rs = ExportResults()
+            for i in range(0,row_count):
+                url = self.tableWidget.item(i,2).text()
+                usrname = self.tableWidget.item(i,0).text()
+                pwd = self.tableWidget.item(i,1).text()
+                f.write(usrname+'       '+pwd+'     '+url+'\n')
+            f.close()
+
 
     def exportResult(self):
         current_path = os.getcwd()
@@ -208,16 +251,17 @@ class MyForm(Ui_MainWindow):
             url = self.tableWidget.item(i,2).text()
             usrname = self.tableWidget.item(i,0).text()
             pwd = self.tableWidget.item(i,1).text()
-            rs.add(url,usrname,pwd)
+
         f.close()
         rs.toString()
-        print('执行完毕')
 
 if __name__ == '__main__':
 
     import sys
     app = QtGui.QApplication(sys.argv)
+    app.setWindowIcon(QtGui.QIcon('WIFI_CHEAT.ico'))
     MainWindow = QtGui.QMainWindow()
+    MainWindow.setWindowIcon(QtGui.QIcon('WIFI_CHEAT.ico'))
     ui = MyForm()
     ui.setupUi(MainWindow)
     MainWindow.show()
